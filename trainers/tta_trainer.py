@@ -284,6 +284,7 @@ class FER2013Trainer(Trainer):
     def _calc_acc_on_private_test_with_tta(self):
         self._model.eval()
         test_acc = 0.0
+        preds=[]
         print("Calc acc on private test with tta..")
         f = open(
             "private_test_log_{}_{}.txt".format(
@@ -296,29 +297,33 @@ class FER2013Trainer(Trainer):
             for idx in tqdm(
                 range(len(self._test_set)), total=len(self._test_set), leave=False
             ):
-                images, targets = self._test_set[idx]
-                targets = torch.LongTensor([targets])
+                images = self._test_set[idx]
+                # targets = torch.LongTensor([targets])
 
                 images = make_batch(images)
                 images = images.cuda(non_blocking=True)
-                targets = targets.cuda(non_blocking=True)
+                # targets = targets.cuda(non_blocking=True)
 
                 outputs = self._model(images)
                 outputs = F.softmax(outputs, 1)
+                preds+=torch.argmax(outputs, dim=1).cpu().numpy().tolist()
 
                 # outputs.shape [tta_size, 7]
-                outputs = torch.sum(outputs, 0)
+                # outputs = torch.sum(outputs, 0)
 
-                outputs = torch.unsqueeze(outputs, 0)
+                # outputs = torch.unsqueeze(outputs, 0)
                 # print(outputs.shape)
                 # TODO: try with softmax first and see the change
-                acc = accuracy(outputs, targets)[0]
-                test_acc += acc.item()
-                f.writelines("{}_{}\n".format(idx, acc.item()))
+                # acc = accuracy(outputs, targets)[0]
+                # test_acc += acc.item()
+                # f.writelines("{}_{}\n".format(idx, acc.item()))
 
-            test_acc = test_acc / (idx + 1)
-        print("Accuracy on private test with tta: {:.3f}".format(test_acc))
+            # test_acc = test_acc / (idx + 1)
+        # print("Accuracy on private test with tta: {:.3f}".format(test_acc))
         f.close()
+        import pandas as pd 
+        pd.DataFrame(preds).to_csv(self._configs['data_path']+'/'+self._configs['arch']+'.csv')
+        print('test_output saved')
         return test_acc
 
     def train(self):
@@ -361,12 +366,12 @@ class FER2013Trainer(Trainer):
             else:
                 self._model.load_state_dict(state["net"])
 
-            if not self._test_set.is_tta():
-                self._test_acc = self._calc_acc_on_private_test()
-            else:
-                self._test_acc = self._calc_acc_on_private_test_with_tta()
+            # if not self._test_set.is_tta():
+            #     self._test_acc = self._calc_acc_on_private_test()
+            # else:
+            #     self._test_acc = self._calc_acc_on_private_test_with_tta()
 
-            # self._test_acc = self._calc_acc_on_private_test()
+            self._test_acc = self._calc_acc_on_private_test_with_tta()
             self._save_weights()
         except Exception as e:
             traceback.print_exc()

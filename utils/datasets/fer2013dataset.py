@@ -5,19 +5,30 @@ import numpy as np
 import pandas as pd
 from torchvision.transforms import transforms
 from torch.utils.data import Dataset
+from PIL import Image
 from utils.augmenters.augment import seg
 
 
+# EMOTION_DICT = {
+#     0: "angry",
+#     1: "disgust",
+#     2: "fear",
+#     3: "happy",
+#     4: "sad",
+#     5: "surprise",
+#     6: "neutral",
+# }
 EMOTION_DICT = {
-    0: "angry",
-    1: "disgust",
-    2: "fear",
-    3: "happy",
-    4: "sad",
-    5: "surprise",
-    6: "neutral",
+    0: "annoyed",
+    1: "content",
+    2: "irritated",
+    3: "joyful",
+    4: "scared",
+    5: "shocked",
+    6: "upset",
 }
-
+# 'annoyed', 'content', 'irritated', 'joyful', 'scared', 'shocked',
+#         'sad'
 
 class FER2013(Dataset):
     def __init__(self, stage, configs, tta=False, tta_size=48):
@@ -32,12 +43,17 @@ class FER2013(Dataset):
             os.path.join(configs["data_path"], "{}.csv".format(stage))
         )
 
-        self._pixels = self._data["pixels"].tolist()
-        self._emotions = pd.get_dummies(self._data["emotion"])
+        self._pixels = self._data["images"].tolist()
+        self._emotions = pd.get_dummies(self._data["labels"])
 
         self._transform = transforms.Compose(
             [
                 transforms.ToPILImage(),
+                transforms.ToTensor(),
+            ]
+        )
+        self._transform_label =  transforms.Compose(
+            [
                 transforms.ToTensor(),
             ]
         )
@@ -49,9 +65,11 @@ class FER2013(Dataset):
         return len(self._pixels)
 
     def __getitem__(self, idx):
-        pixels = self._pixels[idx]
-        pixels = list(map(int, pixels.split(" ")))
-        image = np.asarray(pixels).reshape(48, 48)
+        image = Image.open(os.path.join(self._configs["data_path"],self._stage ,self._pixels[idx]))
+        # print(image.size)
+        # pixels = self._pixels[idx]
+        # pixels = list(map(int, pixels.split(" ")))
+        image = np.asarray(image).reshape(48, 48)
         image = image.astype(np.uint8)
 
         image = cv2.resize(image, self._image_size)
@@ -64,11 +82,11 @@ class FER2013(Dataset):
             images = [seg(image=image) for i in range(self._tta_size)]
             # images = [image for i in range(self._tta_size)]
             images = list(map(self._transform, images))
-            target = self._emotions.iloc[idx].idxmax()
-            return images, target
-
+            # target = self._emotions.iloc[idx].idxmax()
+            return images
+        import torch
         image = self._transform(image)
-        target = self._emotions.iloc[idx].idxmax()
+        target = np.argmax(self._emotions.iloc[idx].values)#self._emotions.iloc[idx]#.idxmax()
         return image, target
 
 
@@ -80,13 +98,13 @@ if __name__ == "__main__":
     data = FER2013(
         "train",
         {
-            "data_path": "/home/z/research/tee/saved/data/fer2013/",
+            "data_path": "../../../dataset/",
             "image_size": 224,
             "in_channels": 3,
         },
     )
     import cv2
-    from barez import pp
+    # from barez import pp
 
     targets = []
 
